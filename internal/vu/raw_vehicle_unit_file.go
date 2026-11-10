@@ -21,7 +21,7 @@ func splitTransferValue(record *vuv1.RawVehicleUnitFile_Record) (data, signature
 	value := record.GetValue()
 	sigSize := int(record.GetSignatureSize())
 
-	if len(value) < sigSize {
+	if sigSize < 0 || sigSize > len(value) {
 		return nil, nil, fmt.Errorf("value too short for signature: got %d bytes, need at least %d", len(value), sigSize)
 	}
 
@@ -81,7 +81,7 @@ func (opts UnmarshalOptions) UnmarshalRawVehicleUnitFile(data []byte) (*vuv1.Raw
 		}
 
 		// Extract complete value (includes signature)
-		if offset+totalSize > len(data) {
+		if totalSize < 0 || totalSize > len(data)-offset {
 			return nil, fmt.Errorf("insufficient data for %v value: need %d bytes, have %d", transferType, totalSize, len(data)-offset)
 		}
 		value := data[offset : offset+totalSize]
@@ -135,16 +135,12 @@ func sizeOfTransferValue(data []byte, transferType vuv1.TransferType) (totalSize
 //
 // Total size = 5 + (recordSize * noOfRecords)
 func sizeOfRecordArray(data []byte, offset int) (int, error) {
-	const headerSize = 5
-	if len(data[offset:]) < headerSize {
-		return 0, fmt.Errorf("insufficient data for RecordArray header: need %d, have %d", headerSize, len(data[offset:]))
+	_, recordSize, noOfRecords, headerSize, err := parseRecordArrayHeader(data, offset)
+	if err != nil {
+		return 0, err
 	}
-
-	recordSize := binary.BigEndian.Uint16(data[offset+1:])
-	noOfRecords := binary.BigEndian.Uint16(data[offset+3:])
-
-	totalSize := headerSize + int(recordSize)*int(noOfRecords)
-	return totalSize, nil
+	// The header parser proves that this sum and product fit in the input.
+	return headerSize + int(recordSize)*int(noOfRecords), nil
 }
 
 // generationFromTransferType extracts generation from transfer type using protobuf reflection.

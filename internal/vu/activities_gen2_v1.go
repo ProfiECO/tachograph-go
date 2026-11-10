@@ -210,11 +210,15 @@ func (opts MarshalOptions) MarshalActivitiesGen2V1(activities *vuv1.ActivitiesGe
 
 // Helper functions for parsing Gen2 V1 RecordArrays
 
-// parseRecordArrayHeader parses the 5-byte RecordArray header.
+// parseRecordArrayHeader parses the 5-byte RecordArray header and validates the
+// complete declared payload before callers allocate records or slice the input.
+// On success, headerSize + int(recordSize)*int(noOfRecords) and its addition to
+// offset are bounded by len(data), including on 32-bit targets. Per-record layout
+// constraints remain the responsibility of the semantic parser.
 // Returns: recordType, recordSize, noOfRecords, bytesConsumed, error
 func parseRecordArrayHeader(data []byte, offset int) (byte, uint16, uint16, int, error) {
 	const headerSize = 5
-	if offset+headerSize > len(data) {
+	if offset < 0 || offset > len(data) || len(data)-offset < headerSize {
 		return 0, 0, 0, 0, fmt.Errorf("insufficient data for RecordArray header at offset %d", offset)
 	}
 
@@ -222,6 +226,17 @@ func parseRecordArrayHeader(data []byte, offset int) (byte, uint16, uint16, int,
 	recordSize := binary.BigEndian.Uint16(data[offset+1 : offset+3])
 	noOfRecords := binary.BigEndian.Uint16(data[offset+3 : offset+5])
 
+	// Zero records are valid (including empty signature placeholders), but a
+	// nonempty array cannot contain zero-byte records.
+	if noOfRecords != 0 && recordSize == 0 {
+		return 0, 0, 0, 0, fmt.Errorf("invalid RecordArray: %d records with zero record size", noOfRecords)
+	}
+	remaining := len(data) - offset - headerSize
+	// Division avoids computing an overflowing product or offset. If this check
+	// passes, both the product and the final offset fit in int and in the input.
+	if recordSize != 0 && int(noOfRecords) > remaining/int(recordSize) {
+		return 0, 0, 0, 0, fmt.Errorf("insufficient data for RecordArray at offset %d: %d records of %d bytes exceed %d available bytes", offset, noOfRecords, recordSize, remaining)
+	}
 	return recordType, recordSize, noOfRecords, headerSize, nil
 }
 
