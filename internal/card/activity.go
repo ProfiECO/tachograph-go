@@ -295,31 +295,44 @@ func (it *cyclicRecordIterator) Next() bool {
 	if it.err != nil {
 		return false
 	}
+	// Test completion and indexes before the backstop: finishing exactly at
+	// maxRecords is not an overflow, and unchecked index addition can overflow.
+	if len(it.buffer) < 4 || it.currentPos < 0 || it.currentPos >= len(it.buffer) {
+		return false
+	}
 	if it.recordCount >= maxRecords {
 		it.err = fmt.Errorf("exceeded maximum record count (%d), possible infinite loop", maxRecords)
 		return false
-	}
-	if len(it.buffer) == 0 {
-		return false // No data to parse
-	}
-	// Validate current position for reading header
-	if it.currentPos < 0 || it.currentPos+4 > len(it.buffer) {
-		return false // Invalid position for header
 	}
 	// Cycle detection: if we've already visited this position, stop.
 	if _, ok := it.seen[it.currentPos]; ok {
 		return false
 	}
 	it.seen[it.currentPos] = struct{}{}
-	// Read record header (4 bytes: prevRecordLength + currentRecordLength)
-	prevRecordLength := int(binary.BigEndian.Uint16(it.buffer[it.currentPos : it.currentPos+2]))
-	currentRecordLength := int(binary.BigEndian.Uint16(it.buffer[it.currentPos+2 : it.currentPos+4]))
+	// The header, like the payload, can straddle the physical ring boundary.
+	var header [4]byte
+	pos := it.currentPos
+	for i := range header {
+		header[i] = it.buffer[pos]
+		pos++
+		if pos == len(it.buffer) {
+			pos = 0
+		}
+	}
+	prevRecordLength := int(binary.BigEndian.Uint16(header[:2]))
+	currentRecordLength := int(binary.BigEndian.Uint16(header[2:]))
 	if currentRecordLength == 0 {
 		return false // Zero-length record signifies end of chain
 	}
 	// Validate record length
-	if currentRecordLength < 4 {
+	if currentRecordLength < 4 || currentRecordLength > len(it.buffer) {
 		it.err = fmt.Errorf("invalid record length %d at position %d", currentRecordLength, it.currentPos)
+		return false
+	}
+	// The oldest record's previous pointer may reference overwritten data.
+	// Validate the length only when the iterator will actually follow it.
+	if it.currentPos != it.oldestPos && prevRecordLength > len(it.buffer) {
+		it.err = fmt.Errorf("invalid previous record length %d at position %d", prevRecordLength, it.currentPos)
 		return false
 	}
 	// Store current record information
@@ -327,8 +340,13 @@ func (it *cyclicRecordIterator) Next() bool {
 	it.recordLength = currentRecordLength
 	// Extract record bytes, handling buffer wrap-around
 	it.recordBytes = make([]byte, currentRecordLength)
-	for i := 0; i < currentRecordLength; i++ {
-		it.recordBytes[i] = it.buffer[(it.currentPos+i)%len(it.buffer)]
+	pos = it.currentPos
+	for i := range it.recordBytes {
+		it.recordBytes[i] = it.buffer[pos]
+		pos++
+		if pos == len(it.buffer) {
+			pos = 0
+		}
 	}
 	it.recordCount++
 	// Move to previous record for next iteration.
