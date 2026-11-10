@@ -10,10 +10,28 @@ Evidence: upstream PR metadata and per-file patches, compared with local baselin
 implementations and tests. The linked PRs are the primary sources; reviewed head
 SHAs below make the snapshot explicit. Upstream test code was reviewed, but the
 unintegrated branches and their claimed private download corpora were **not run**.
-Our validation applies to v0.18.2 plus the CONTROL_CARD fix; see
+The initial validation applied to v0.18.2 plus the CONTROL_CARD fix; see
 [maintenance and validation](profitach-maintenance.md).
 
-## Decision table
+## Maintained-fork follow-up (2026-11-10)
+
+The table and integration order below retain the **initial baseline audit**.
+The subsequently authorized queue has advanced these items:
+
+| Item | Current disposition | Commit / evidence |
+| --- | --- | --- |
+| #42 | Selectively integrated, including explicit unknown values and invalid semantic encoding errors. | `97deac8`; exhaustive byte round trips, corrected Gen1 goldens, unchanged Gen2 goldens. |
+| #23 | Protections integrated using checked input spans before arithmetic, allocation and slicing; flawed generic arithmetic proposal not imported. | `b4b03ab`; malformed cases across RecordArray readers, fuzzing and amd64/386 suites. |
+| #26 | Useful coverage integrated; independently reproduced wrapped-header, invalid-length and exact-limit failures repaired. | `4867ed4`; ordering, raw round trips, fuzzing and amd64/386 suites. |
+| Issue #39 | Assessment complete; authentication implementation pending positive fixtures and independently confirmed signed ranges. | `40e6381`; [defects and staged repair](gen2-vu-signature-assessment.md). |
+
+CONTROL_CARD remains intact; do not replay #19/#41. No unrelated PR was merged.
+Next priorities are #39's fixture/oracle gate and isolated repair, then #25
+trust-chain matching, selected #24 activity validation, and remaining EF/nation/
+calibration work subject to the original compatibility gates below.
+See [next release notes and final validation](releases/v0.18.3-profieco.2.md).
+
+## Decision table (initial audit)
 
 “Present” refers to the original v0.18.2 baseline, before our fix. Existing helper
 functions or schemas do not mean that a proposed behavior is already integrated.

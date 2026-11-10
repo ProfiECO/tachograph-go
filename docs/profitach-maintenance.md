@@ -5,6 +5,9 @@ Initial upstream baseline: `way-platform/tachograph-go` **v0.18.2**,
 2026-11-10. See the [upstream PR audit](upstream-pr-audit.md) for the reviewed
 patches and ordered recommendations.
 
+The sections below describe the initial baseline task. For subsequent commits
+and final validation, see [the next release notes](releases/v0.18.3-profieco.2.md).
+
 ## Local patch
 
 `internal/dd/full_card_number.go` adds CONTROL_CARD to the existing owner branch
