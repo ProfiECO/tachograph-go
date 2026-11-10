@@ -148,10 +148,18 @@ func (opts MarshalOptions) MarshalVuFaultRecord(record *ddv1.VuFaultRecord) ([]b
 	)
 
 	// Marshal faultType (1 byte)
-	canvas[idxFaultType] = opts.marshalEventFaultType(record.GetFaultType(), record.GetUnrecognizedFaultType())
+	encodedidxFaultType, err := opts.marshalEventFaultType(record.GetFaultType(), record.GetUnrecognizedFaultType())
+	if err != nil {
+		return nil, fmt.Errorf("marshal idxFaultType: %w", err)
+	}
+	canvas[idxFaultType] = encodedidxFaultType
 
 	// Marshal faultRecordPurpose (1 byte)
-	canvas[idxFaultRecordPurpose] = opts.marshalEventFaultRecordPurpose(record.GetRecordPurpose(), record.GetUnrecognizedRecordPurpose())
+	encodedidxFaultRecordPurpose, err := opts.marshalEventFaultRecordPurpose(record.GetRecordPurpose(), record.GetUnrecognizedRecordPurpose())
+	if err != nil {
+		return nil, fmt.Errorf("marshal idxFaultRecordPurpose: %w", err)
+	}
+	canvas[idxFaultRecordPurpose] = encodedidxFaultRecordPurpose
 
 	// Marshal faultBeginTime (4 bytes)
 	beginTime, err := opts.MarshalTimeReal(record.GetBeginTime())
@@ -198,40 +206,42 @@ func (opts MarshalOptions) MarshalVuFaultRecord(record *ddv1.VuFaultRecord) ([]b
 	return canvas[:], nil
 }
 
-// parseEventFaultType parses an EventFaultType byte value.
+// parseEventFaultType maps protocol annotations, not protobuf enum numbers.
+// Unknown bytes remain in the explicit unrecognized field.
 func (opts UnmarshalOptions) parseEventFaultType(b byte) (ddv1.EventFaultType, int32) {
-	val := int32(b)
-	eventFaultType := ddv1.EventFaultType(val)
-	if eventFaultType.String() == "EVENT_FAULT_TYPE_UNSPECIFIED" && val != 0 {
-		return ddv1.EventFaultType_EVENT_FAULT_TYPE_UNSPECIFIED, val
+	value, err := UnmarshalEnum[ddv1.EventFaultType](b)
+	if err != nil {
+		return ddv1.EventFaultType_EVENT_FAULT_TYPE_UNSPECIFIED, int32(b)
 	}
-	return eventFaultType, 0
+	return value, 0
 }
 
-// marshalEventFaultType marshals an EventFaultType to a byte.
-func (opts MarshalOptions) marshalEventFaultType(eventFaultType ddv1.EventFaultType, unrecognized int32) byte {
+func (opts MarshalOptions) marshalEventFaultType(value ddv1.EventFaultType, unrecognized int32) (byte, error) {
 	if unrecognized != 0 {
-		return byte(unrecognized)
+		if unrecognized < 0 || unrecognized > 255 {
+			return 0, fmt.Errorf("unrecognized event/fault type out of byte range: %d", unrecognized)
+		}
+		return byte(unrecognized), nil
 	}
-	return byte(eventFaultType)
+	return MarshalEnum(value)
 }
 
-// parseEventFaultRecordPurpose parses an EventFaultRecordPurpose byte value.
 func (opts UnmarshalOptions) parseEventFaultRecordPurpose(b byte) (ddv1.EventFaultRecordPurpose, int32) {
-	val := int32(b)
-	purpose := ddv1.EventFaultRecordPurpose(val)
-	if purpose.String() == "EVENT_FAULT_RECORD_PURPOSE_UNSPECIFIED" && val != 0 {
-		return ddv1.EventFaultRecordPurpose_EVENT_FAULT_RECORD_PURPOSE_UNSPECIFIED, val
+	value, err := UnmarshalEnum[ddv1.EventFaultRecordPurpose](b)
+	if err != nil {
+		return ddv1.EventFaultRecordPurpose_EVENT_FAULT_RECORD_PURPOSE_UNSPECIFIED, int32(b)
 	}
-	return purpose, 0
+	return value, 0
 }
 
-// marshalEventFaultRecordPurpose marshals an EventFaultRecordPurpose to a byte.
-func (opts MarshalOptions) marshalEventFaultRecordPurpose(purpose ddv1.EventFaultRecordPurpose, unrecognized int32) byte {
+func (opts MarshalOptions) marshalEventFaultRecordPurpose(value ddv1.EventFaultRecordPurpose, unrecognized int32) (byte, error) {
 	if unrecognized != 0 {
-		return byte(unrecognized)
+		if unrecognized < 0 || unrecognized > 255 {
+			return 0, fmt.Errorf("unrecognized record purpose out of byte range: %d", unrecognized)
+		}
+		return byte(unrecognized), nil
 	}
-	return byte(purpose)
+	return MarshalEnum(value)
 }
 
 // AnonymizeVuFaultRecord anonymizes a VU fault record.

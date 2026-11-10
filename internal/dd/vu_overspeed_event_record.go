@@ -136,10 +136,18 @@ func (opts MarshalOptions) MarshalVuOverspeedEventRecord(record *ddv1.VuOverspee
 	)
 
 	// Marshal eventType (1 byte)
-	canvas[idxEventType] = opts.marshalEventFaultType(record.GetEventType(), record.GetUnrecognizedEventType())
+	encodedidxEventType, err := opts.marshalEventFaultType(record.GetEventType(), record.GetUnrecognizedEventType())
+	if err != nil {
+		return nil, fmt.Errorf("marshal idxEventType: %w", err)
+	}
+	canvas[idxEventType] = encodedidxEventType
 
 	// Marshal eventRecordPurpose (1 byte)
-	canvas[idxEventRecordPurpose] = opts.marshalEventFaultRecordPurpose(record.GetRecordPurpose(), record.GetUnrecognizedRecordPurpose())
+	encodedidxEventRecordPurpose, err := opts.marshalEventFaultRecordPurpose(record.GetRecordPurpose(), record.GetUnrecognizedRecordPurpose())
+	if err != nil {
+		return nil, fmt.Errorf("marshal idxEventRecordPurpose: %w", err)
+	}
+	canvas[idxEventRecordPurpose] = encodedidxEventRecordPurpose
 
 	// Marshal eventBeginTime (4 bytes)
 	beginTime, err := opts.MarshalTimeReal(record.GetBeginTime())
